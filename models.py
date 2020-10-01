@@ -69,6 +69,7 @@ class VQVAE(torch.nn.Module):
             json.dump(self.params_dict, _json)
         for attr in ['encoder', 'decoder']:
             getattr(self, attr).save(os.path.join(outdir, attr))
+        torch.save(self.state_dict(), os.path.join(outdir, 'nnet.mdl'))
 
     @classmethod
     def load_from_dir(cls, nnetdir, map_location=None):
@@ -92,6 +93,9 @@ class VQVAE(torch.nn.Module):
                                              map_location=map_location)
         net = cls(encoder, decoder, num_centroids=params_dict['num_centroids'])
         net.to(map_location)
+        state_dict = torch.load(os.path.join(nnetdir, 'nnet.mdl'),
+                                map_location=map_location)
+        net.load_state_dict(state_dict)
         return net
 
 
