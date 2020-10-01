@@ -228,7 +228,7 @@ class JitterLayer(GenericLayer):
             index_tensor = index_tensor + index_change
             index_tensor.clamp_min_(0)
             index_tensor.clamp_max_(x.size(-2) - 1)
-            x = torch.gather(x, -2, index_tensor).squeeze()
+            x = torch.gather(x, -2, index_tensor.to(x.device)).squeeze()
         return x
 
 

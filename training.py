@@ -86,6 +86,7 @@ class SimpleTrainingLoop(SimpleLoader):
                                            self.optimizer.param_groups[0]['lr'])
               )
         for phase in phases:
+            print('\t{} '.format(phase.title()), end='')
             phase_beg = time.time()
             if phase == 'train':
                 self.model.train()
