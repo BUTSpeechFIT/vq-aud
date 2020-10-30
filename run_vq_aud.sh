@@ -47,11 +47,11 @@ fi
 echo "--> Training in $expdir/$db/$subset/vqvae_${num_units}/"
 nnetdir=$expdir/$db/$subset/vqvae_${num_units}/
 it=0
-while [ ! -f $nnetdir/.done.train ]; do #.done.train will be created inside the python script (training.py:203)
+while [ ! -f $nnetdir/.done.train ]; do #.done.train will be created inside the python script (training.py:209)
     it=$[it+1]
     resume="--resume"
     ls $nnetdir/*/*/*.mdl &> /dev/null || resume=""
-    python3 scripts/vq_aud/train_vq_aud.py \
+    python3 ./train_vq_aud.py \
          $resume \
          -s $spk_dim $spk_opts \
          --nj 999 \
@@ -72,7 +72,7 @@ for x in $test; do
 	outdir=$nnetdir/decode_perframe_epoch$decode_epoch/$x
 	echo "--> Decoding in $nnetdir/decode_perframe_epoch$decode_epoch/$x"
         if [ ! -f $outdir/trans ]; then
-            python3 -u scripts/vq_aud/decode.py \
+            python3 -u ./decode.py \
                 --upsample \
                 --utts data/$db/$subset/$x/uttids \
                 $featdir/$db/$subset/$x/mfcc.npz \
