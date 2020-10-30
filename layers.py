@@ -187,7 +187,7 @@ class SubsamplingLayer(GenericLayer):
             x = self.encoder(x)
             lens = [_.size(1) for _ in x]
             maxlen = max(lens)
-            x = [torch.cat((arr, torch.zeros(x[0].size(0), maxlen - lv, x[0].size(-1))), dim=1)
+            x = [torch.cat((arr, torch.zeros(x[0].size(0), maxlen - lv, x[0].size(-1), device=x[0].device)), dim=1)
                  for lv, arr in zip(lens, x)]
             x = torch.cat(x, dim=-1)
         else:
@@ -298,6 +298,7 @@ class CompositeModel(nn.Module):
         state_dict = torch.load(os.path.join(nnetdir, 'nnet.mdl'),
                                 map_location=map_location)
         net.to(map_location)
+        net.to(map_location)
         net.load_state_dict(state_dict)
         return net
 
@@ -351,7 +352,6 @@ def test_block():
             "12": {'layer_name': 'Embedding', 'input_dim': 26, 'output_dim': 32},
             "13": {'layer_name': 'CNN', 'output_dim': 256, 'kernel_size': 12},
             "14": {'layer_name': 'JitterLayer', 'p': 0.4},
-            # "15": {'layer_name': 'CNN', 'output_dim': 256, 'kernel_size': 13, 'kind': '2D'},
             }
     model3 = CompositeModel(desc, ordering=['13', '10', '6', '9', '4', '1', '10', '7', '8', '3', '11',
                                             '14'], input_dim=42)

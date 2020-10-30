@@ -35,6 +35,15 @@ def main():
                         help='weight of the embedding distance loss')
     parser.add_argument('--com-loss-weight', '-c', type=float, default=1,
                         help='weight of the commitment loss')
+    parser.add_argument('--utt2spk', '-u',
+                        help='file mapping utterances to speaker IDs, also doubles as a '
+                             'speaker embedding training flag')
+    parser.add_argument('--use-ma', action='store_true',
+                        help='use exponential moving average to update the centroids instead of gradient descent')
+    parser.add_argument('--ma-momentum', type=float, default=0.9,
+                        help='momentum to use for exponential moving average')
+    parser.add_argument('--speaker-embeddings-dim', '-s', type=int, default=32,
+                        help='dimension of speaker embeddings, only useful if utt2spk is set')
     parser.add_argument('encoder_json',
                         help='json file defining the encoder model structure as defined in layers.py')
     parser.add_argument('decoder_json',
@@ -65,11 +74,23 @@ def main():
 
     featdim = data[data.files[0]].shape[1]
     docs = data.files
-    len_val = int(args.validation_split * len(docs))
-    train_docs = docs[len_val:]
-    val_docs = docs[:len_val]
+    # len_val = int(args.validation_split * len(docs))
+    # train_docs = docs[len_val:]
+    train_docs = docs[:]
+    # val_docs = docs[:len_val]
+    val_docs = docs[:]
     pad_value = -1000
 
+    if args.utt2spk:
+        utt2spk = {x.strip().split()[0]: x.strip().split()[1]
+                   for x in open(args.utt2spk)}
+        speakers = sorted(list(set([x for x in utt2spk.values()])))
+        speakers = {x: i for i, x in enumerate(speakers)}
+        num_speakers = len(speakers)
+    else:
+        utt2spk = None
+        speakers = None
+        num_speakers = None
     dataset_class = dataloaders.get_dataset(args.dataset_name)
     train_dataloader = dataloaders.dataloader(dataset_class,
                                               batch_size=args.batch_size,
@@ -78,6 +99,8 @@ def main():
                                               pin_memory=True,
                                               pad_value=pad_value,
                                               data=data,
+                                              utt2spk=utt2spk,
+                                              speakers=speakers,
                                               docs=train_docs,
                                               sort_by_length=True,
                                               )
@@ -88,6 +111,8 @@ def main():
                                               pin_memory=True,
                                               pad_value=pad_value,
                                               data=data,
+                                              utt2spk=utt2spk,
+                                              speakers=speakers,
                                               docs=val_docs,
                                               sort_by_length=True,
                                               )
@@ -100,7 +125,11 @@ def main():
                                           input_dim=encoder_model.output_dim)
 
     vq_model = models.VQVAE(encoder=encoder_model, decoder=decoder_model,
-                            num_centroids=args.num_centroids)
+                            num_centroids=args.num_centroids,
+                            num_speakers=num_speakers,
+                            speaker_embeddings_dim=args.speaker_embeddings_dim,
+                            use_ma=args.use_ma,
+                            ma_momentum=args.ma_momentum)
 
     trainer_class = training.get_trainer(args.trainer)
     trainer_conf = {}

@@ -99,9 +99,10 @@ class SimpleTrainingLoop(SimpleLoader):
 
             for batch_no, batch_data in enumerate(data_loaders[phase]):
                 self.optimizer.zero_grad()
-                data_batch, label_batch = batch_data
+                data_batch, label_batch, speaker_ids = batch_data
                 data_batch = data_batch.to(self.device)
                 label_batch = label_batch.to(self.device)
+                speaker_ids = speaker_ids.to(self.device)
                 with torch.set_grad_enabled(phase == 'train'):
                     encoded = self.model.encoder(data_batch).contiguous()
                     quantized, alignment = self.model.quantize(encoded, return_alignment=True)
@@ -111,22 +112,26 @@ class SimpleTrainingLoop(SimpleLoader):
                     output = self.model.decoder(quantized)
                     predicted_centroids = self.model.centroids[alignment]
                     encoded = encoded.view(-1, encoded.size(-1))
-                    # In case of subsampling
+
                     new_length = output.size(1)
-                    # old_length = label_batch.size(1)
-                    # if old_length % new_length:
-                    #     subs_factor = int(old_length / new_length) + 1
-                    # else:
-                    #     subs_factor = int(old_length / new_length)
-                    # label_batch = label_batch[:, ::subs_factor]
-                    label_batch = label_batch[:, :new_length]
+                    old_length = label_batch.size(1)
+                    # Try to correct slight mismatches from down-sampling and up-sampling.
+                    # Be careful in case of down-sampling without up-sampling
+                    if old_length > new_length:
+                        label_batch = label_batch[:, :new_length]
+                    elif new_length > old_length:
+                        output = output[:, :old_length]
+
                     distance_loss = criterion['dis_loss'](encoded, predicted_centroids.detach())
                     commitment_loss = criterion['com_loss'](predicted_centroids, encoded.detach())
                     reconstruction_loss = criterion['rec_loss'](output, label_batch)
-                    total_loss = reconstruction_loss + distance_loss + commitment_loss
+                    if self.model.use_ma:
+                        total_loss = reconstruction_loss + distance_loss
+                    else:
+                        total_loss = reconstruction_loss + distance_loss + commitment_loss
                     # Not part of the graph, just metrics to be monitored
                     mask = (label_batch != data_loaders[phase].dataset.pad_value).float()
-                    numel = torch.sum(mask).item()
+                    numel = 1  # torch.sum(mask).item()
                     running_loss += reconstruction_loss.item()
                     running_dist_sum += distance_loss.item()
                     running_count += numel

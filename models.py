@@ -32,16 +32,36 @@ class GumbelSoftmaxQuantizer(Function):
 
 
 class VQVAE(torch.nn.Module):
-    def __init__(self, encoder, decoder, num_centroids=256):
+    def __init__(self, encoder, decoder, num_centroids=256, num_speakers=None, speaker_embeddings_dim=0,
+                 use_ma=False, ma_momentum=0.9):
         super(VQVAE, self).__init__()
         self.model_name = 'VQVAE'
-        self.params_dict = {'num_centroids': num_centroids}
+        self.params_dict = {'num_centroids': num_centroids,
+                            'num_speakers': num_speakers,
+                            'speaker_embeddings_dim': speaker_embeddings_dim,
+                            'use_ma': use_ma,
+                            'ma_momentum': ma_momentum,
+                            }
         self.encoder = encoder
         self.decoder = decoder
         self.quantize_fn = EuclideanQuantizer.apply
         self.num_centroids = num_centroids
-        centroids = torch.randn(self.num_centroids, self.encoder.output_dim, requires_grad=True)
-        self.centroids = torch.nn.Parameter(centroids)
+        self.ma_momentum = ma_momentum
+        centroids = torch.randn(self.num_centroids, self.encoder.output_dim)
+        if use_ma:
+            self.register_buffer('centroids', centroids)
+            self.register_buffer('ma_num', centroids.clone())
+            self.register_buffer('ma_denom', torch.zeros(self.num_centroids))
+        else:
+            self.centroids = torch.nn.Parameter(centroids, requires_grad=True)
+            self.ma_num = None
+            self.ma_denom = None
+        self.num_speakers = num_speakers
+        self.speaker_embeddings_dim = speaker_embeddings_dim
+        self.use_ma = use_ma
+        if self.num_speakers is not None:
+            assert self.speaker_embeddings_dim
+            self.speaker_embeddings = torch.nn.Embedding(self.num_speakers, self.speaker_embeddings_dim)
 
     def quantize(self, x, return_alignment=False):
         x_shape = x.shape
@@ -55,12 +75,28 @@ class VQVAE(torch.nn.Module):
             return x, alignment
         return x
 
-    def forward(self, x):
-        #  Assume x is of batch * length * dim
-        x = self.encoder(x)
-        x = self.quantize(x)
+    def decode(self, x, speaker_ids=None):
+        if self.num_speakers:
+            assert speaker_ids is not None
+            speaker_embedding = self.speaker_embeddings(speaker_ids).unsqueeze(-2)
+            speaker_embedding = speaker_embedding.expand(speaker_embedding.size(0), x.size(1),
+                                                         speaker_embedding.size(-1))
+            x = torch.cat((x, speaker_embedding), dim=-1)
         x = self.decoder(x)
         return x
+
+    def forward(self, x, speaker_ids=None):
+        #  Assume x is of batch * length * dim
+        x_enc = self.encoder(x)
+        x_quant, ali = self.quantize(x_enc, return_alignment=True)
+        ali_one_hot = torch.nn.functional.one_hot(ali, self.num_centroids)
+        if self.training and self.use_ma:
+            self.ma_denom = self.ma_momentum * self.ma_denom + (1 - self.ma_momentum) * ali_one_hot.sum(dim=0)
+            ma_num_prop = torch.matmul(ali_one_hot.float().t(), x_enc.detach().view(-1, x_enc.size(-1)))
+            self.ma_num = self.ma_momentum * self.ma_num + (1 - self.ma_momentum) * ma_num_prop
+            self.centroids = self.ma_num / self.ma_denom.clamp_min(1)
+        x_dec = self.decode(x_quant, speaker_ids=speaker_ids)
+        return x_dec
 
     def save(self, outdir):
         with open(os.path.join(outdir, 'nnet_kind.txt'), 'w') as _kind:
@@ -74,6 +110,9 @@ class VQVAE(torch.nn.Module):
     @classmethod
     def load_from_dir(cls, nnetdir, map_location=None):
         params_dict = {'num_centroids': 256,
+                       'num_speakers': None,
+                       'speaker_embeddings_dim': 0,
+                       'use_ma': False,
                        }
         with open(os.path.join(nnetdir, 'nnet.json')) as _json:
             params_dict_from_file = json.load(_json)
@@ -91,7 +130,7 @@ class VQVAE(torch.nn.Module):
         decoder_kind = _model_names[decoder_model_name]
         decoder = decoder_kind.load_from_dir(os.path.join(nnetdir, 'decoder'),
                                              map_location=map_location)
-        net = cls(encoder, decoder, num_centroids=params_dict['num_centroids'])
+        net = cls(encoder, decoder, **params_dict)
         net.to(map_location)
         state_dict = torch.load(os.path.join(nnetdir, 'nnet.mdl'),
                                 map_location=map_location)

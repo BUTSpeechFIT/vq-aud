@@ -1,5 +1,6 @@
 import os
 import pickle
+import io
 import sys
 import shlex
 import subprocess

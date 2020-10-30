@@ -6,5 +6,5 @@ class MaskedMSELoss:
     def __call__(self, prediction, labels):
         loss_mat = (prediction - labels) ** 2
         mask = labels != self.pad_value
-        loss = loss_mat[mask].sum()
+        loss = loss_mat[mask].mean()
         return self.weight * loss
