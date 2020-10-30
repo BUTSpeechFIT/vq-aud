@@ -1,0 +1,31 @@
+{
+    "layers": {
+        "0": {
+            "layer_name": "Jitter",
+            "p": 0
+        },
+        "1": {
+            "layer_name": "Ups",
+            "factor": 2
+        },
+        "2": {
+            "layer_name": "GRU",
+            "bidirectional": true,
+            "output_dim": 128
+        },
+        "3": {
+            "layer_name": "FF",
+            "output_dim": 256
+        },
+        "4": {
+            "layer_name": "ReLU"
+        },
+        "5": {
+            "layer_name": "FF",
+            "output_dim": 39
+        }
+    },
+    "ordering": [
+        "0", "1", "3", "4", "5"
+    ]
+}

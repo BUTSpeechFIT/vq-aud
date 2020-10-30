@@ -1,0 +1,21 @@
+{
+    "optimizer": "Adam",
+    "learning_rate": 2e-3,
+    "num_epochs": 100,
+    "verbose": false,
+    "use_early_stopping": false,
+    "early_stopping_loss": 0,
+    "cooldown": 1,
+    "num_epochs_early_stopping": 10,
+    "delta_early_stopping": 0.0001,
+    "learning_rate_lower_bound": 1e-06,
+    "learning_rate_scale": 0.5,
+    "num_epochs_reduce_lr": 4,
+    "num_epochs_cooldown": 8,
+    "use_model_checkpoint": true,
+    "model_checkpoint_period": 1,
+    "start_epoch": 0,
+    "gradient_clip": null,
+    "warmup_initial_scale": 0.2,
+    "warmup_num_epochs": 2
+}

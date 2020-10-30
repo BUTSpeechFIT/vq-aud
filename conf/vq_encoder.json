@@ -1,0 +1,42 @@
+{
+    "layers": {
+        "0": {
+            "layer_name": "LSTM",
+            "output_dim": 128,
+            "bidirectional": true
+        },
+        "1": {
+            "layer_name": "BatchNormLayer"
+        },
+        "2": {
+            "layer_name": "ReLU"
+        },
+        "3": {
+            "layer_name": "Drop",
+            "p": 0.5
+        },
+        "4": {
+            "layer_name": "LSTM",
+            "output_dim": 128,
+            "bidirectional": true
+        },
+        "5": {
+            "layer_name": "Subs",
+            "factor": 2,
+            "concat": true
+        },
+        "6": {
+            "layer_name": "CNN",
+            "output_dim": 16,
+            "kernel_size": 1,
+            "padding": 0
+        },
+        "7": {
+            "layer_name": "FF",
+            "output_dim": 8
+        }
+    },
+    "ordering": [
+        "0", "1", "4", "1", "4", "1", "4", "5", "1", "4", "1", "6"
+    ]
+}
